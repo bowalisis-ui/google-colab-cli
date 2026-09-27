@@ -17,11 +17,19 @@ import logging
 import os
 import signal
 import sys
-import termios
 import threading
 import time
-import tty
 from urllib.parse import urlparse
+
+try:
+    import termios
+except ImportError:
+    termios = None  # type: ignore[assignment]
+
+try:
+    import tty
+except ImportError:
+    tty = None  # type: ignore[assignment]
 
 import websocket
 
@@ -133,8 +141,12 @@ def connect_console(session: SessionState):
     ws_url = f"{ws_scheme}://{parsed.netloc}/colab/tty?colab-runtime-proxy-token={session.token}"
 
     is_tty = sys.stdin.isatty()
+    if is_tty and (termios is None or tty is None):
+        raise RuntimeError(
+            "Interactive console is not supported on this platform (termios and tty are required)."
+        )
     fd = sys.stdin.fileno() if is_tty else None
-    old_settings = termios.tcgetattr(fd) if is_tty else None
+    old_settings = termios.tcgetattr(fd) if is_tty and termios is not None else None
 
     ws = websocket.WebSocketApp(
         url=ws_url,
@@ -150,9 +162,10 @@ def connect_console(session: SessionState):
             send_terminal_size(ws)
 
     try:
-        if is_tty:
+        if is_tty and tty is not None and termios is not None:
             tty.setraw(fd, termios.TCSANOW)
-            signal.signal(signal.SIGWINCH, handle_sigwinch)
+            if hasattr(signal, "SIGWINCH"):
+                signal.signal(signal.SIGWINCH, handle_sigwinch)
 
         # This is a blocking call until the connection is closed
         ws.run_forever()
@@ -166,7 +179,9 @@ def connect_console(session: SessionState):
     finally:
         if is_tty:
             # Always ensure the terminal is restored to its original state
-            termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+            if termios is not None:
+                termios.tcsetattr(fd, termios.TCSANOW, old_settings)
             # Restore the default signal handler for resize
-            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+            if hasattr(signal, "SIGWINCH"):
+                signal.signal(signal.SIGWINCH, signal.SIG_DFL)
         print("\r\nConnection closed.")

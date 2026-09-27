@@ -547,7 +547,12 @@ def _install_rm_signal_handlers(do_rm: Callable[[], None]) -> None:
         do_rm()
         os._exit(0)
 
-    for sig in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
+    signals = [
+        s
+        for s in (getattr(signal, "SIGHUP", None), signal.SIGTERM, signal.SIGINT)
+        if s is not None
+    ]
+    for sig in signals:
         try:
             signal.signal(sig, _on_signal)
         except (ValueError, OSError):

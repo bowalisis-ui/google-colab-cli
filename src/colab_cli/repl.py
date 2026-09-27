@@ -54,13 +54,25 @@ class ColabREPL:
         def _(event):
             event.current_buffer.insert_text("\n")
 
-        self.session = PromptSession(
-            history=InMemoryHistory(),
-            lexer=PygmentsLexer(PythonLexer),
-            include_default_pygments_style=False,
-            key_bindings=self.kb,
-            multiline=True,
-        )
+        try:
+            self.session = PromptSession(
+                history=InMemoryHistory(),
+                lexer=PygmentsLexer(PythonLexer),
+                include_default_pygments_style=False,
+                key_bindings=self.kb,
+                multiline=True,
+            )
+        except Exception:
+            from prompt_toolkit.output import DummyOutput
+
+            self.session = PromptSession(
+                history=InMemoryHistory(),
+                lexer=PygmentsLexer(PythonLexer),
+                include_default_pygments_style=False,
+                key_bindings=self.kb,
+                multiline=True,
+                output=DummyOutput(),
+            )
         self.style = Style.from_dict(
             {
                 "prompt": "bold blue",

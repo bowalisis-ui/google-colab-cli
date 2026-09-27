@@ -387,15 +387,24 @@ def _extract_command_names(help_output: str) -> list[str]:
             continue
         if in_commands:
             stripped = line.strip()
-            if stripped.startswith("╰") or stripped.startswith("`"):
+            if stripped.startswith(("╰", "\u2570", "`", "+")) and names:
                 break
-            # Lines look like:  "│ help        Show help for a command. │"
+            # Skip wrapped description lines where description wraps onto a new line.
+            # Normal command lines have: '│ command         description │' (1 space after border)
+            # Continuation lines have:   '│                 continuation│' (multiple spaces after border)
+            if (
+                (stripped.startswith("│") or stripped.startswith("|"))
+                and len(stripped) > 2
+                and stripped[1:3] == "  "
+            ):
+                continue
             # Strip the rich box characters.
-            inner = stripped.strip("│").strip()
+            inner = stripped.strip("│|").strip()
             if not inner:
                 continue
             tok = inner.split()[0]
-            names.append(tok)
+            if not any(c in "─-+╰│" for c in tok):
+                names.append(tok)
     return names
 
 

@@ -251,8 +251,10 @@ def test_proxy_mode_rm_teardown_idempotent(mock_common_state, mocker):
         ssh_module, "_connect_websocket", return_value=MagicMock()
     )
 
+    hup_signal = getattr(_signal, "SIGHUP", _signal.SIGTERM)
+
     def bridge_then_hup(ws):
-        handlers[_signal.SIGHUP](_signal.SIGHUP, None)  # OpenSSH HUPs us
+        handlers[hup_signal](hup_signal, None)  # OpenSSH HUPs us
         return 0
 
     mocker.patch.object(

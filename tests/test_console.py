@@ -15,8 +15,17 @@
 import json
 import os
 import sys
-import termios
 from unittest.mock import MagicMock, patch
+
+try:
+    import termios
+except ImportError:
+    termios = None
+
+try:
+    import tty
+except ImportError:
+    tty = None
 
 from colab_cli.console import connect_console, on_message, on_open
 from colab_cli.state import SessionState
@@ -33,6 +42,10 @@ def mock_session():
     )
 
 
+@pytest.mark.skipif(
+    termios is None or tty is None,
+    reason="termios and tty are required for raw TTY mode",
+)
 @patch("colab_cli.console.websocket.WebSocketApp")
 @patch("colab_cli.console.tty.setraw")
 @patch("colab_cli.console.termios.tcgetattr")
@@ -79,6 +92,10 @@ def test_console_initialization(
     )
 
 
+@pytest.mark.skipif(
+    termios is None or tty is None,
+    reason="termios and tty are required for patching raw TTY mocks",
+)
 @patch("colab_cli.console.websocket.WebSocketApp")
 @patch("colab_cli.console.tty.setraw")
 @patch("colab_cli.console.termios.tcgetattr")
@@ -104,6 +121,32 @@ def test_console_piped_input(
     mock_tcgetattr.assert_not_called()
     mock_setraw.assert_not_called()
     mock_tcsetattr.assert_not_called()
+
+
+def test_console_unsupported_platform_raises(mock_session):
+    with patch("colab_cli.console.termios", None), patch(
+        "colab_cli.console.sys.stdin.isatty", return_value=True
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match="Interactive console is not supported on this platform",
+        ):
+            connect_console(mock_session)
+
+
+@patch("colab_cli.console.websocket.WebSocketApp")
+@patch("colab_cli.console.sys.stdin.isatty", return_value=False)
+def test_console_piped_on_unsupported_platform(mock_isatty, mock_ws_app, mock_session):
+    mock_ws_instance = MagicMock()
+    mock_ws_app.return_value = mock_ws_instance
+    mock_ws_instance.run_forever.return_value = None
+
+    with patch("colab_cli.console.termios", None), patch(
+        "colab_cli.console.tty", None
+    ), patch("colab_cli.console.threading.Thread"):
+        connect_console(mock_session)
+
+    mock_ws_app.assert_called_once()
 
 
 @patch("colab_cli.console.os.get_terminal_size")
