@@ -113,7 +113,14 @@ def save_output(outputs, cell):
 def display_output(out, output_image=None):
     if out.get("output_type") == "stream":
         stream = sys.stderr if out.get("name") == "stderr" else sys.stdout
-        stream.write(out.get("text", ""))
+        text = out.get("text", "")
+        try:
+            stream.write(text)
+        except UnicodeEncodeError:
+            if hasattr(stream, "buffer"):
+                stream.buffer.write(text.encode("utf-8", errors="replace"))
+            else:
+                stream.write(text.encode("ascii", errors="replace").decode("ascii"))
         stream.flush()
     elif "data" in out:
         data = out["data"]
@@ -127,7 +134,14 @@ def display_output(out, output_image=None):
     elif out.get("output_type") == "error":
         tb = out.get("traceback", [])
         if tb:
-            sys.stderr.write("".join(tb) + "\n")
+            err_text = "".join(tb) + "\n"
+            try:
+                sys.stderr.write(err_text)
+            except UnicodeEncodeError:
+                if hasattr(sys.stderr, "buffer"):
+                    sys.stderr.buffer.write(err_text.encode("utf-8", errors="replace"))
+                else:
+                    sys.stderr.write(err_text.encode("ascii", errors="replace").decode("ascii"))
         else:
             ename = out.get("ename", "Error")
             evalue = out.get("evalue", "")
@@ -188,7 +202,7 @@ def exec_command(
                             {"code": cell.source, "id": cell.id, "cell": cell}
                         )
         else:
-            with open(file, "r") as f:
+            with open(file, "r", encoding="utf-8") as f:
                 code_blocks.append({"code": f.read(), "id": None})
     else:
         if is_stdin_tty():
