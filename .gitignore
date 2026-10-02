@@ -67,6 +67,7 @@ venv.bak/
 *.swo
 *~
 .DS_Store
+desktop.ini
 
 # Tool caches
 .ruff_cache/
@@ -87,3 +88,4 @@ docs/credential propagation - flow details.md
 docs/credential propagation analysis.md
 docs/creds.md
 get_drive_source.py
+run_inference.py
